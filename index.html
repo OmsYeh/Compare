@@ -220,8 +220,8 @@ function compareJson() {
     const obj1 = JSON.parse(input1);
     const obj2 = JSON.parse(input2);
 
-    output1.innerHTML = renderJson(obj1, obj2, 0, 0);
-    output2.innerHTML = renderJson(obj2, obj1, 0, 0);
+    output1.innerHTML = renderJson(obj1, obj2, 0, 0, true);
+    output2.innerHTML = renderJson(obj2, obj1, 0, 0, true);
 
   } catch (e) {
     output1.textContent = 'Awaiting valid JSON input…';
@@ -229,7 +229,7 @@ function compareJson() {
   }
 }
 
-function renderJson(source, target, depth = 0, indent = 0) {
+function renderJson(source, target, depth = 0, indent = 0, isRoot = false) {
   if (depth > 10) {
     return '<span class="mismatch">Deep nesting limit reached (max 10 levels shown).</span>';
   }
@@ -241,11 +241,10 @@ function renderJson(source, target, depth = 0, indent = 0) {
       // Target is not an array, whole array is mismatch
       return `<span class="mismatch">${JSON.stringify(source, null, 2)}</span>`;
     }
-    // Compare arrays element by element
     let arrHtml = '[<br>';
     for (let i = 0; i < source.length; i++) {
-      arrHtml += '&nbsp;'.repeat((indent + 2) * 2);
-      arrHtml += renderJson(source[i], target[i], depth + 1, indent + 2);
+      arrHtml += '&nbsp;'.repeat((indent + 1) * 2);
+      arrHtml += renderJson(source[i], target[i], depth + 1, indent + 1);
       if (i < source.length - 1) arrHtml += ',';
       arrHtml += '<br>';
     }
@@ -262,14 +261,35 @@ function renderJson(source, target, depth = 0, indent = 0) {
       const sourceVal = source[key];
       const targetVal = target[key];
       if (sourceVal === null || sourceVal === undefined) {
-        valuePart = `<span class="nullish">${JSON.stringify(sourceVal)}</span>`;
+        // null/undefined: orange if both are nullish, else mismatch
+        if (targetVal === null || targetVal === undefined) {
+          valuePart = `<span class="nullish">${JSON.stringify(sourceVal)}</span>`;
+          keyClass = 'match';
+        } else {
+          valuePart = `<span class="nullish">${JSON.stringify(sourceVal)}</span>`;
+          keyClass = 'mismatch';
+        }
       } else if (typeof sourceVal === 'object') {
-        valuePart = renderJson(sourceVal, targetVal, depth + 1, indent + 2);
+        valuePart = renderJson(sourceVal, targetVal, depth + 1, indent + 1);
+        // If both are objects/arrays and deeply equal, mark key as match
+        if (JSON.stringify(sourceVal) === JSON.stringify(targetVal)) {
+          keyClass = 'match';
+        } else {
+          keyClass = 'mismatch';
+        }
       } else {
-        valuePart = compareValues(sourceVal, targetVal);
+        // primitive
+        if (sourceVal === targetVal) {
+          valuePart = `<span class="match">${JSON.stringify(sourceVal)}</span>`;
+          keyClass = 'match';
+        } else {
+          valuePart = `<span class="mismatch">${JSON.stringify(sourceVal)}</span>`;
+          keyClass = 'mismatch';
+        }
       }
     } else {
       valuePart = `<span class="mismatch">${JSON.stringify(source[key])}</span>`;
+      keyClass = 'mismatch';
     }
     html += '&nbsp;'.repeat((indent + 1) * 2);
     html += `"${'<span class="' + keyClass + '">' + key + '</span>'}": ${valuePart}`;
@@ -282,7 +302,11 @@ function renderJson(source, target, depth = 0, indent = 0) {
 
 function compareValues(val1, val2) {
   if (val1 === null || val1 === undefined) {
-    return `<span class="nullish">${JSON.stringify(val1)}</span>`;
+    if (val2 === null || val2 === undefined) {
+      return `<span class="nullish">${JSON.stringify(val1)}</span>`;
+    } else {
+      return `<span class="nullish">${JSON.stringify(val1)}</span>`;
+    }
   }
   const isMatch = val1 === val2;
   return `<span class="${isMatch ? 'match' : 'mismatch'}">${JSON.stringify(val1)}</span>`;
