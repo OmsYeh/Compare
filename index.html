@@ -201,6 +201,7 @@ function validateAndFormat(inputId, errorId) {
 
 ['jsonInput1', 'jsonInput2'].forEach((id, idx) => {
   document.getElementById(id).addEventListener('blur', () => validateAndFormat(id, 'error' + (idx + 1)));
+  document.getElementById(id).addEventListener('input', () => validateAndFormat(id, 'error' + (idx + 1)));
 });
 
 function compareJson() {
@@ -219,8 +220,8 @@ function compareJson() {
     const obj1 = JSON.parse(input1);
     const obj2 = JSON.parse(input2);
 
-    output1.innerHTML = renderJson(obj1, obj2, 0);
-    output2.innerHTML = renderJson(obj2, obj1, 0);
+    output1.innerHTML = renderJson(obj1, obj2, 0, 0);
+    output2.innerHTML = renderJson(obj2, obj1, 0, 0);
 
   } catch (e) {
     output1.textContent = 'Awaiting valid JSON input…';
@@ -228,44 +229,54 @@ function compareJson() {
   }
 }
 
-function renderJson(source, target, depth) {
-  if (depth > 10) return '<span class="mismatch">Deep nesting limit reached (max 10 levels shown).</span>';
+function renderJson(source, target, depth = 0, indent = 0) {
+  if (depth > 10) {
+    return '<span class="mismatch">Deep nesting limit reached (max 10 levels shown).</span>';
+  }
   if (typeof source !== 'object' || source === null) {
     return compareValues(source, target);
   }
   if (Array.isArray(source)) {
-    const arrMatch = JSON.stringify(source) === JSON.stringify(target);
-    return `<span class="${arrMatch ? 'match' : 'mismatch'}">${JSON.stringify(source)}</span>`;
+    if (!Array.isArray(target)) {
+      // Target is not an array, whole array is mismatch
+      return `<span class="mismatch">${JSON.stringify(source, null, 2)}</span>`;
+    }
+    // Compare arrays element by element
+    let arrHtml = '[<br>';
+    for (let i = 0; i < source.length; i++) {
+      arrHtml += '&nbsp;'.repeat((indent + 2) * 2);
+      arrHtml += renderJson(source[i], target[i], depth + 1, indent + 2);
+      if (i < source.length - 1) arrHtml += ',';
+      arrHtml += '<br>';
+    }
+    arrHtml += '&nbsp;'.repeat(indent * 2) + ']';
+    return arrHtml;
   }
-  let html = '{\n';
+  let html = '{<br>';
   const keys = Object.keys(source);
   keys.forEach((key, idx) => {
     const keyExists = target && Object.prototype.hasOwnProperty.call(target, key);
+    let keyClass = keyExists ? 'match' : 'mismatch';
     let valuePart = '';
-    let keyClass = 'mismatch';
     if (keyExists) {
       const sourceVal = source[key];
       const targetVal = target[key];
-      // Check for value match
-      let valueMatch = false;
       if (sourceVal === null || sourceVal === undefined) {
         valuePart = `<span class="nullish">${JSON.stringify(sourceVal)}</span>`;
-        valueMatch = (targetVal === null || targetVal === undefined);
-      } else if (typeof sourceVal === 'object' && sourceVal !== null) {
-        valuePart = renderJson(sourceVal, targetVal, depth + 1);
-        valueMatch = JSON.stringify(sourceVal) === JSON.stringify(targetVal);
+      } else if (typeof sourceVal === 'object') {
+        valuePart = renderJson(sourceVal, targetVal, depth + 1, indent + 2);
       } else {
         valuePart = compareValues(sourceVal, targetVal);
-        valueMatch = JSON.stringify(sourceVal) === JSON.stringify(targetVal);
       }
-      keyClass = valueMatch ? 'match' : 'mismatch';
     } else {
       valuePart = `<span class="mismatch">${JSON.stringify(source[key])}</span>`;
-      keyClass = 'mismatch';
     }
-    html += `  "<span class="${keyClass}">${key}</span>": ${valuePart}${idx < keys.length - 1 ? ',' : ''}\n`;
+    html += '&nbsp;'.repeat((indent + 1) * 2);
+    html += `"${'<span class="' + keyClass + '">' + key + '</span>'}": ${valuePart}`;
+    if (idx < keys.length - 1) html += ',';
+    html += '<br>';
   });
-  html += '}';
+  html += '&nbsp;'.repeat(indent * 2) + '}';
   return html;
 }
 
@@ -273,7 +284,7 @@ function compareValues(val1, val2) {
   if (val1 === null || val1 === undefined) {
     return `<span class="nullish">${JSON.stringify(val1)}</span>`;
   }
-  const isMatch = JSON.stringify(val1) === JSON.stringify(val2);
+  const isMatch = val1 === val2;
   return `<span class="${isMatch ? 'match' : 'mismatch'}">${JSON.stringify(val1)}</span>`;
 }
 
