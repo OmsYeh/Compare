@@ -184,14 +184,36 @@ document.getElementById('darkModeToggle').addEventListener('click', function() {
 
 let debounceTimers = {};
 
+function normalizeConsoleLogObject(input) {
+  // Remove class names like RowDataPacket { ... } => { ... }
+  let output = input.replace(/([A-Za-z0-9_]+)\s*{/g, '{');
+
+  // Convert single quotes to double quotes
+  output = output.replace(/'/g, '"');
+
+  // Quote unquoted keys (only at object level, not inside strings)
+  output = output.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+
+  // Remove trailing commas before closing braces/brackets
+  output = output.replace(/,(\s*[}\]])/g, '$1');
+
+  // Replace True/False/null/undefined with JS equivalents
+  output = output.replace(/\btrue\b/gi, 'true');
+  output = output.replace(/\bfalse\b/gi, 'false');
+  output = output.replace(/\bnull\b/gi, 'null');
+  output = output.replace(/\bundefined\b/gi, 'null');
+
+  return output;
+}
+
 // --- Your parser logic as a function ---
 function parseAndFixJson(input) {
   let fixedInput = input;
   try {
-    fixedInput = fixedInput.replace(/'([^']*)'/g, '"$1"');
-    fixedInput = fixedInput.replace(/([{,]\\s*)([a-zA-Z0-9_]+)\\s*:/g, '$1\"$2\":');
-    fixedInput = fixedInput.replace(/,(\\s*[}\\]])/g, '$1');
-    fixedInput = fixedInput.replace(/:\\s*(\\d*\\*+\\d*)/g, ': \"$1\"');
+    // First, normalize console.log style objects
+    fixedInput = normalizeConsoleLogObject(fixedInput);
+
+    // The rest of your parser logic
     const openBraces = (fixedInput.match(/{/g) || []).length;
     const closeBraces = (fixedInput.match(/}/g) || []).length;
     if (openBraces > closeBraces) {
