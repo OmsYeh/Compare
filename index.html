@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JSON Comparison Tool</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #f0f4f8, #d9e2ec);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
+      position: relative;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      width: 95%;
+      max-width: 1200px;
+      margin: 2rem auto;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #333;
+      text-align: center;
+    }
+    .comparison-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin-bottom: 1rem;
+    }
+    .pane {
+      flex: 1 1 48%;
+      display: flex;
+      flex-direction: column;
+      min-width: 300px;
+      box-sizing: border-box;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      resize: vertical;
+      margin-bottom: 0.5rem;
+      box-sizing: border-box;
+    }
+    .error-msg {
+      color: #dc3545;
+      font-size: 0.9rem;
+      margin-top: -0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .pane-buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .pane-buttons button {
+      flex: 1;
+      padding: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+    .copy-btn { background: #28a745; color: white; }
+    .copy-btn:hover { background: #218838; transform: translateY(-2px); }
+    .clear-box-btn { background: #ffc107; color: #333; }
+    .clear-box-btn:hover { background: #e0a800; transform: translateY(-2px); }
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .buttons button {
+      padding: 0.7rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+    .compare-btn { background: #007bff; color: white; }
+    .compare-btn:hover { background: #0056b3; transform: translateY(-2px); }
+    .clear-btn { background: #dc3545; color: white; }
+    .clear-btn:hover { background: #b52b38; transform: translateY(-2px); }
+    .output {
+      background: #f9fafb;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-family: monospace;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      min-height: 200px;
+      flex: 1;
+      box-sizing: border-box;
+    }
+    .match { color: #2e7d32; font-weight: bold; }
+    .mismatch { color: #c62828; font-weight: bold; }
+    .nullish { color: #ff9800; font-weight: bold; }
+    .dark-mode-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #555;
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+      z-index: 1000;
+    }
+    body.dark-mode {
+      background: linear-gradient(135deg, #1a1a1a, #2c2c2c);
+      color: #f0f0f0;
+    }
+    body.dark-mode .container {
+      background: #2c2c2c;
+      color: #f0f0f0;
+    }
+    body.dark-mode textarea {
+      background: #333;
+      border: 1px solid #555;
+      color: #eee;
+    }
+    body.dark-mode .output {
+      background: #1e1e1e;
+      border-color: #444;
+    }
+  </style>
+</head>
+<body>
+  <button class="dark-mode-toggle" id="darkModeToggle">🌓</button>
+  <div class="container">
+    <h1>JSON Comparison Tool</h1>
+    <div class="comparison-wrapper">
+      <div class="pane">
+        <textarea id="jsonInput1" placeholder="Paste first JSON here..."></textarea>
+        <div id="error1" class="error-msg"></div>
+        <div class="pane-buttons">
+          <button class="copy-btn" onclick="copyText('jsonInput1')">Copy</button>
+          <button class="clear-box-btn" onclick="clearBox('jsonInput1', 'output1', 'error1')">Clear</button>
+        </div>
+        <div id="output1" class="output">Awaiting valid JSON input…</div>
+      </div>
+      <div class="pane">
+        <textarea id="jsonInput2" placeholder="Paste second JSON here..."></textarea>
+        <div id="error2" class="error-msg"></div>
+        <div class="pane-buttons">
+          <button class="copy-btn" onclick="copyText('jsonInput2')">Copy</button>
+          <button class="clear-box-btn" onclick="clearBox('jsonInput2', 'output2', 'error2')">Clear</button>
+        </div>
+        <div id="output2" class="output">Awaiting valid JSON input…</div>
+      </div>
+    </div>
+    <div class="buttons">
+      <button class="compare-btn" onclick="compareJson()">Compare JSON</button>
+      <button class="clear-btn" onclick="clearFields()">Clear All</button>
+    </div>
+  </div>
+<script>
+document.getElementById('darkModeToggle').addEventListener('click', function() {
+  document.body.classList.toggle('dark-mode');
+});
+
+let debounceTimers = {};
+
+function validateAndFormat(inputId, errorId) {
+  clearTimeout(debounceTimers[inputId]);
+  debounceTimers[inputId] = setTimeout(() => {
+    const textarea = document.getElementById(inputId);
+    const errorMsg = document.getElementById(errorId);
+    try {
+      const parsed = JSON.parse(textarea.value);
+      textarea.value = JSON.stringify(parsed, null, 2);
+      errorMsg.textContent = '';
+    } catch (e) {
+      errorMsg.textContent = 'Invalid JSON format.';
+    }
+  }, 500);
+}
+
+['jsonInput1', 'jsonInput2'].forEach((id, idx) => {
+  document.getElementById(id).addEventListener('blur', () => validateAndFormat(id, 'error' + (idx + 1)));
+});
+
+function compareJson() {
+  const input1 = document.getElementById('jsonInput1').value.trim();
+  const input2 = document.getElementById('jsonInput2').value.trim();
+  const output1 = document.getElementById('output1');
+  const output2 = document.getElementById('output2');
+
+  if (!input1 || !input2) {
+    output1.textContent = 'Awaiting valid JSON input…';
+    output2.textContent = 'Awaiting valid JSON input…';
+    return;
+  }
+
+  try {
+    const obj1 = JSON.parse(input1);
+    const obj2 = JSON.parse(input2);
+
+    output1.innerHTML = renderJson(obj1, obj2, 0);
+    output2.innerHTML = renderJson(obj2, obj1, 0);
+
+  } catch (e) {
+    output1.textContent = 'Awaiting valid JSON input…';
+    output2.textContent = 'Awaiting valid JSON input…';
+  }
+}
+
+function renderJson(source, target, depth) {
+  if (depth > 10) return '<span class="mismatch">Deep nesting limit reached (max 10 levels shown).</span>';
+  if (typeof source !== 'object' || source === null) {
+    return compareValues(source, target);
+  }
+  if (Array.isArray(source)) {
+    const arrMatch = JSON.stringify(source) === JSON.stringify(target);
+    return `<span class="${arrMatch ? 'match' : 'mismatch'}">${JSON.stringify(source)}</span>`;
+  }
+  let html = '{\n';
+  const keys = Object.keys(source);
+  keys.forEach((key, idx) => {
+    const keyExists = target && Object.prototype.hasOwnProperty.call(target, key);
+    const keyClass = keyExists ? 'match' : 'mismatch';
+    let valuePart = '';
+    if (keyExists) {
+      const sourceVal = source[key];
+      const targetVal = target[key];
+      if (sourceVal === null || sourceVal === undefined) {
+        valuePart = `<span class="nullish">${JSON.stringify(sourceVal)}</span>`;
+      } else if (typeof sourceVal === 'object' && sourceVal !== null) {
+        valuePart = renderJson(sourceVal, targetVal, depth + 1);
+      } else {
+        valuePart = compareValues(sourceVal, targetVal);
+      }
+    } else {
+      valuePart = `<span class="mismatch">${JSON.stringify(source[key])}</span>`;
+    }
+    html += `  "<span class="${keyClass}">${key}</span>": ${valuePart}${idx < keys.length - 1 ? ',' : ''}\n`;
+  });
+  html += '}';
+  return html;
+}
+
+function compareValues(val1, val2) {
+  if (val1 === null || val1 === undefined) {
+    return `<span class="nullish">${JSON.stringify(val1)}</span>`;
+  }
+  const isMatch = JSON.stringify(val1) === JSON.stringify(val2);
+  return `<span class="${isMatch ? 'match' : 'mismatch'}">${JSON.stringify(val1)}</span>`;
+}
+
+function clearFields() {
+  clearBox('jsonInput1', 'output1', 'error1');
+  clearBox('jsonInput2', 'output2', 'error2');
+}
+
+function copyText(inputId) {
+  const textarea = document.getElementById(inputId);
+  textarea.select();
+  textarea.setSelectionRange(0, 99999);
+  document.execCommand('copy');
+}
+
+function clearBox(inputId, outputId, errorId) {
+  document.getElementById(inputId).value = '';
+  document.getElementById(outputId).innerHTML = 'Awaiting valid JSON input…';
+  document.getElementById(errorId).textContent = '';
+}
+</script>
+</body>
+</html>
