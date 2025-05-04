@@ -107,7 +107,7 @@
       border: 1px solid #ccc;
       font-family: monospace;
       overflow-x: auto;
-      white-space: pre-wrap;
+      white-space: pre;
       min-height: 200px;
       flex: 1;
       box-sizing: border-box;
@@ -184,13 +184,36 @@ document.getElementById('darkModeToggle').addEventListener('click', function() {
 
 let debounceTimers = {};
 
+// --- Your parser logic as a function ---
+function parseAndFixJson(input) {
+  let fixedInput = input;
+  try {
+    fixedInput = fixedInput.replace(/'([^']*)'/g, '"$1"');
+    fixedInput = fixedInput.replace(/([{,]\\s*)([a-zA-Z0-9_]+)\\s*:/g, '$1\"$2\":');
+    fixedInput = fixedInput.replace(/,(\\s*[}\\]])/g, '$1');
+    fixedInput = fixedInput.replace(/:\\s*(\\d*\\*+\\d*)/g, ': \"$1\"');
+    const openBraces = (fixedInput.match(/{/g) || []).length;
+    const closeBraces = (fixedInput.match(/}/g) || []).length;
+    if (openBraces > closeBraces) {
+      fixedInput += '}'.repeat(openBraces - closeBraces);
+    } else if (closeBraces > openBraces) {
+      fixedInput = '{'.repeat(closeBraces - openBraces) + fixedInput;
+    }
+    return JSON.stringify(JSON.parse(fixedInput), null, 2);
+  } catch (e) {
+    return input; // fallback to original if parsing fails
+  }
+}
+
 function validateAndFormat(inputId, errorId) {
   clearTimeout(debounceTimers[inputId]);
   debounceTimers[inputId] = setTimeout(() => {
     const textarea = document.getElementById(inputId);
     const errorMsg = document.getElementById(errorId);
     try {
-      const parsed = JSON.parse(textarea.value);
+      // Run through parser first!
+      const fixed = parseAndFixJson(textarea.value);
+      const parsed = JSON.parse(fixed);
       textarea.value = JSON.stringify(parsed, null, 2);
       errorMsg.textContent = '';
     } catch (e) {
@@ -217,11 +240,14 @@ function compareJson() {
   }
 
   try {
-    const obj1 = JSON.parse(input1);
-    const obj2 = JSON.parse(input2);
+    // Run both through parser before comparing
+    const fixed1 = parseAndFixJson(input1);
+    const fixed2 = parseAndFixJson(input2);
+    const obj1 = JSON.parse(fixed1);
+    const obj2 = JSON.parse(fixed2);
 
-    output1.innerHTML = renderJson(obj1, obj2, 0, 0, true);
-    output2.innerHTML = renderJson(obj2, obj1, 0, 0, true);
+    output1.innerHTML = renderJson(obj1, obj2, 0, 0);
+    output2.innerHTML = renderJson(obj2, obj1, 0, 0);
 
   } catch (e) {
     output1.textContent = 'Awaiting valid JSON input…';
@@ -229,7 +255,7 @@ function compareJson() {
   }
 }
 
-function renderJson(source, target, depth = 0, indent = 0, isRoot = false) {
+function renderJson(source, target, depth = 0, indent = 0) {
   if (depth > 10) {
     return '<span class="mismatch">Deep nesting limit reached (max 10 levels shown).</span>';
   }
@@ -238,20 +264,19 @@ function renderJson(source, target, depth = 0, indent = 0, isRoot = false) {
   }
   if (Array.isArray(source)) {
     if (!Array.isArray(target)) {
-      // Target is not an array, whole array is mismatch
       return `<span class="mismatch">${JSON.stringify(source, null, 2)}</span>`;
     }
-    let arrHtml = '[<br>';
+    let arrHtml = '[\n';
     for (let i = 0; i < source.length; i++) {
-      arrHtml += '&nbsp;'.repeat((indent + 1) * 2);
-      arrHtml += renderJson(source[i], target[i], depth + 1, indent + 1);
+      arrHtml += ' '.repeat((indent + 2) * 2);
+      arrHtml += renderJson(source[i], target[i], depth + 1, indent + 2);
       if (i < source.length - 1) arrHtml += ',';
-      arrHtml += '<br>';
+      arrHtml += '\n';
     }
-    arrHtml += '&nbsp;'.repeat(indent * 2) + ']';
+    arrHtml += ' '.repeat((indent) * 2) + ']';
     return arrHtml;
   }
-  let html = '{<br>';
+  let html = '{\n';
   const keys = Object.keys(source);
   keys.forEach((key, idx) => {
     const keyExists = target && Object.prototype.hasOwnProperty.call(target, key);
@@ -261,7 +286,6 @@ function renderJson(source, target, depth = 0, indent = 0, isRoot = false) {
       const sourceVal = source[key];
       const targetVal = target[key];
       if (sourceVal === null || sourceVal === undefined) {
-        // null/undefined: orange if both are nullish, else mismatch
         if (targetVal === null || targetVal === undefined) {
           valuePart = `<span class="nullish">${JSON.stringify(sourceVal)}</span>`;
           keyClass = 'match';
@@ -270,15 +294,13 @@ function renderJson(source, target, depth = 0, indent = 0, isRoot = false) {
           keyClass = 'mismatch';
         }
       } else if (typeof sourceVal === 'object') {
-        valuePart = renderJson(sourceVal, targetVal, depth + 1, indent + 1);
-        // If both are objects/arrays and deeply equal, mark key as match
+        valuePart = renderJson(sourceVal, targetVal, depth + 1, indent + 2);
         if (JSON.stringify(sourceVal) === JSON.stringify(targetVal)) {
           keyClass = 'match';
         } else {
           keyClass = 'mismatch';
         }
       } else {
-        // primitive
         if (sourceVal === targetVal) {
           valuePart = `<span class="match">${JSON.stringify(sourceVal)}</span>`;
           keyClass = 'match';
@@ -291,12 +313,12 @@ function renderJson(source, target, depth = 0, indent = 0, isRoot = false) {
       valuePart = `<span class="mismatch">${JSON.stringify(source[key])}</span>`;
       keyClass = 'mismatch';
     }
-    html += '&nbsp;'.repeat((indent + 1) * 2);
+    html += ' '.repeat((indent + 1) * 2);
     html += `"${'<span class="' + keyClass + '">' + key + '</span>'}": ${valuePart}`;
     if (idx < keys.length - 1) html += ',';
-    html += '<br>';
+    html += '\n';
   });
-  html += '&nbsp;'.repeat(indent * 2) + '}';
+  html += ' '.repeat(indent * 2) + '}';
   return html;
 }
 
