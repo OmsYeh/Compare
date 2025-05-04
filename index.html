@@ -241,20 +241,27 @@ function renderJson(source, target, depth) {
   const keys = Object.keys(source);
   keys.forEach((key, idx) => {
     const keyExists = target && Object.prototype.hasOwnProperty.call(target, key);
-    const keyClass = keyExists ? 'match' : 'mismatch';
     let valuePart = '';
+    let keyClass = 'mismatch';
     if (keyExists) {
       const sourceVal = source[key];
       const targetVal = target[key];
+      // Check for value match
+      let valueMatch = false;
       if (sourceVal === null || sourceVal === undefined) {
         valuePart = `<span class="nullish">${JSON.stringify(sourceVal)}</span>`;
+        valueMatch = (targetVal === null || targetVal === undefined);
       } else if (typeof sourceVal === 'object' && sourceVal !== null) {
         valuePart = renderJson(sourceVal, targetVal, depth + 1);
+        valueMatch = JSON.stringify(sourceVal) === JSON.stringify(targetVal);
       } else {
         valuePart = compareValues(sourceVal, targetVal);
+        valueMatch = JSON.stringify(sourceVal) === JSON.stringify(targetVal);
       }
+      keyClass = valueMatch ? 'match' : 'mismatch';
     } else {
       valuePart = `<span class="mismatch">${JSON.stringify(source[key])}</span>`;
+      keyClass = 'mismatch';
     }
     html += `  "<span class="${keyClass}">${key}</span>": ${valuePart}${idx < keys.length - 1 ? ',' : ''}\n`;
   });
